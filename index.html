@@ -1,181 +1,42 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Ultimate Gaming Portal</title>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-    
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Free Game Portal</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #121212; color: white; text-align: center; margin: 0; padding: 20px; }
-        .container { max-width: 600px; margin: auto; }
-        .stats-box { background: #1e1e1e; border: 1px solid #333; padding: 20px; border-radius: 12px; margin-bottom: 20px; }
-        button { background: #00e676; color: black; border: none; padding: 10px 20px; font-weight: bold; border-radius: 5px; cursor: pointer; transition: 0.3s; }
-        button:hover { background: #00c853; transform: scale(1.05); }
-        .progress-bg { background: #333; height: 12px; border-radius: 6px; margin: 10px 0; overflow: hidden; }
-        #level-bar { background: #00e676; height: 100%; width: 0%; transition: width 0.5s; }
-        table { width: 100%; margin-top: 10px; border-collapse: collapse; }
-        th, td { padding: 8px; border-bottom: 1px solid #333; }
-        #exp-live { color: #ffeb3b; font-weight: bold; }
+        body { font-family: sans-serif; background: #1a1a1a; color: white; text-align: center; }
+        .ad-space { background: #333; margin: 20px auto; padding: 10px; max-width: 728px; border: 1px dashed #555; }
+        .game-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; padding: 20px; }
+        .game-card { background: #2a2a2a; border-radius: 10px; padding: 10px; transition: 0.3s; }
+        .game-card:hover { transform: scale(1.05); background: #444; }
+        .game-card img { width: 100%; border-radius: 8px; }
+        .play-btn { display: inline-block; margin-top: 10px; padding: 10px 20px; background: #ff4757; color: white; text-decoration: none; border-radius: 5px; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>🎮 Gaming Dashboard</h1>
+    <h1>🎮 Pro Game Hub</h1>
 
-    <div id="auth-ui" class="stats-box">
-        <button id="login-btn">Sign in with Google</button>
+    <div class="ad-space">
+        <p style="font-size: 12px; color: #888;">ADVERTISEMENT</p>
+        <div id="top-ad">Your Ad Here</div>
     </div>
 
-    <div id="player-ui" class="stats-box" style="display:none;">
-        <h2 id="p-name">Player Name</h2>
-        <p>Level: <span id="p-level">1</span> | Gold: 💰 <span id="p-gold">0</span></p>
-        <div class="progress-bg"><div id="level-bar"></div></div>
-        <p>Total EXP: <span id="p-exp">0</span></p>
-        <hr>
-        <p>Current Mission EXP: <span id="exp-live">0</span></p>
-        <button onclick="claimMission()">Claim Rewards</button>
-    </div>
+    <div class="game-grid">
+        <div class="game-card">
+            <img src="https://via.placeholder.com/200x150" alt="Game 1">
+            <h3>Super Runner</h3>
+            <a href="games/runner/index.html" class="play-btn">Play Now</a>
+        </div>
 
-    <div id="shop-ui" class="stats-box" style="display:none;">
-        <h3>🛒 Gold Shop</h3>
-        <button onclick="buyItem('Iron Sword', 200)">⚔️ Iron Sword (200g)</button>
-        <button onclick="buyItem('Magic Cloak', 500)">✨ Magic Cloak (500g)</button>
-        <p><b>Inventory:</b> <span id="p-inv">Empty</span></p>
-    </div>
-
-    <div class="stats-box">
-        <h3>🏆 Global Top 10</h3>
-        <table>
-            <thead><tr><th>Rank</th><th>Player</th><th>EXP</th></tr></thead>
-            <tbody id="leader-body"></tbody>
-        </table>
-    </div>
-</div>
-
-<script>
-    // --- STEP 1: CONFIGURATION ---
-    const firebaseConfig = {
-        apiKey: "YOUR_API_KEY",
-        authDomain: "YOUR_PROJECT.firebaseapp.com",
-        projectId: "YOUR_PROJECT_ID",
-        storageBucket: "YOUR_PROJECT.appspot.com",
-        messagingSenderId: "YOUR_ID",
-        appId: "YOUR_APP_ID"
-    };
-    
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const db = firebase.firestore();
-
-    let currentUser = null;
-    let missionExp = 0;
-    let lastLevel = 0;
-
-    // --- STEP 2: AUTH LOGIC ---
-    document.getElementById('login-btn').onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
-
-    auth.onAuthStateChanged(user => {
-        if (user) {
-            currentUser = user;
-            document.getElementById('auth-ui').style.display = 'none';
-            document.getElementById('player-ui').style.display = 'block';
-            document.getElementById('shop-ui').style.display = 'block';
-            syncUserData(user);
-            startLiveExp();
-        }
-    });
-
-    // --- STEP 3: DATA SYNC ---
-    function syncUserData(user) {
-        db.collection("players").doc(user.uid).onSnapshot(doc => {
-            if (doc.exists) {
-                const data = doc.data();
-                updateUI(data);
-                checkLevelUp(data.exp || 0, user.uid);
-            } else {
-                db.collection("players").doc(user.uid).set({
-                    displayName: user.displayName,
-                    exp: 0,
-                    gold: 0,
-                    score: 0,
-                    inventory: []
-                });
-            }
-        });
-        loadLeaderboard();
-    }
-
-    // --- STEP 4: GAME MECHANICS ---
-    function startLiveExp() {
-        setInterval(() => {
-            missionExp += 2;
-            document.getElementById('exp-live').innerText = missionExp;
-        }, 1000);
-    }
-
-    async function claimMission() {
-        const ref = db.collection("players").doc(currentUser.uid);
-        await ref.update({
-            exp: firebase.firestore.FieldValue.increment(missionExp),
-            gold: firebase.firestore.FieldValue.increment(5) // Bonus gold per claim
-        });
-        missionExp = 0;
-    }
-
-    function checkLevelUp(exp, uid) {
-        const currentLevel = Math.floor(Math.sqrt(exp) / 10) + 1;
-        if (lastLevel > 0 && currentLevel > lastLevel) {
-            const reward = currentLevel * 50;
-            db.collection("players").doc(uid).update({ gold: firebase.firestore.FieldValue.increment(reward) });
-            alert(`Level Up! You are now Level ${currentLevel}. Received ${reward} Gold!`);
-        }
-        lastLevel = currentLevel;
-    }
-
-    async function buyItem(name, cost) {
-        const ref = db.collection("players").doc(currentUser.uid);
-        try {
-            await db.runTransaction(async (t) => {
-                const doc = await t.get(ref);
-                const gold = doc.data().gold || 0;
-                if (gold < cost) throw "Not enough Gold!";
-                t.update(ref, {
-                    gold: gold - cost,
-                    inventory: firebase.firestore.FieldValue.arrayUnion(name)
-                });
-            });
-            alert("Bought " + name);
-        } catch (e) { alert(e); }
-    }
-
-    // --- STEP 5: UI UPDATES ---
-    function updateUI(data) {
-        document.getElementById('p-name').innerText = data.displayName;
-        document.getElementById('p-gold').innerText = data.gold || 0;
-        document.getElementById('p-exp').innerText = data.exp || 0;
-        document.getElementById('p-inv').innerText = data.inventory?.join(", ") || "Empty";
+        <div class="game-card">
+            <img src="https://via.placeholder.com/200x150" alt="Game 2">
+            <h3>Space Wars</h3>
+            <a href="games/space/index.html" class="play-btn">Play Now</a>
+        </div>
         
-        const lvl = Math.floor(Math.sqrt(data.exp || 0) / 10) + 1;
-        document.getElementById('p-level').innerText = lvl;
-        
-        const nextLvlExp = Math.pow(lvl * 10, 2);
-        const currentLvlExp = Math.pow((lvl - 1) * 10, 2);
-        const progress = ((data.exp - currentLvlExp) / (nextLvlExp - currentLvlExp)) * 100;
-        document.getElementById('level-bar').style.width = progress + "%";
-    }
+        </div>
 
-    function loadLeaderboard() {
-        db.collection("players").orderBy("exp", "desc").limit(10).onSnapshot(snap => {
-            let html = "";
-            let rank = 1;
-            snap.forEach(doc => {
-                html += `<tr><td>${rank++}</td><td>${doc.data().displayName}</td><td>${doc.data().exp}</td></tr>`;
-            });
-            document.getElementById('leader-body').innerHTML = html;
-        });
-    }
-</script>
 </body>
 </html>
